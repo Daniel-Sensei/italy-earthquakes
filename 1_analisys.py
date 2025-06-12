@@ -1,102 +1,90 @@
 import pandas as pd
-import numpy as np
 
-# Read the CSV file (adjust the file path if needed)
-csv_file = '0_earthquake_italy_full.csv'
-df = pd.read_csv(csv_file)
-
-def is_valid_value(val, col_dtype):
+def analyze_data_quality_complete(file_path):
     """
-    Checks validity based on a simple domain rule:
-    - For numeric types, checks if it can be converted to a float.
-    - For datetime types, tries converting with pd.to_datetime.
-    - For object (string) types, checks if the string is not empty.
-    """
-    if pd.isnull(val):
-        return False
-    if np.issubdtype(col_dtype, np.number):
-        try:
-            float(val)
-            return True
-        except:
-            return False
-    elif np.issubdtype(col_dtype, np.datetime64):
-        try:
-            pd.to_datetime(val)
-            return True
-        except:
-            return False
-    else:
-        # For strings or objects: consider non-empty strings as valid.
-        if isinstance(val, str) and val.strip() != '':
-            return True
-        else:
-            return False
+    Performs an advanced data quality analysis on an earthquake dataset,
+    including completeness, validity, precision (proxy), and uniqueness,
+    and presents the results in a consolidated tabular format.
 
-def count_precision(val, col_dtype):
+    Args:
+        file_path (str): The path to the CSV file to be analyzed.
     """
-    For numeric types, counts the value as 'precise' if it has at most 2 decimal places.
-    For other types, assumes non-null values are precise.
-    """
-    if pd.isnull(val):
-        return 0
-    if np.issubdtype(col_dtype, np.floating):
-        try:
-            s = str(val)
-            if '.' in s:
-                decimals = s.split('.')[1]
-                return 1 if len(decimals) <= 2 else 0
-            else:
-                return 1
-        except:
-            return 0
-    else:
-        # For non-numeric types, assume a non-null value is precise.
-        return 1
+    try:
+        # Load the dataset from the CSV file
+        df = pd.read_csv(file_path)
+        print(f"Dataset loaded successfully. Total number of records: {len(df)}\n")
+    except FileNotFoundError:
+        print(f"Error: The file '{file_path}' was not found.")
+        return
 
-# Dictionary to store the metrics per column.
-metrics = {}
-
-for col in df.columns:
-    total_count = len(df)
-    non_null_count = df[col].notnull().sum()
+    # Dictionary to store the results in a structured way
+    results = {}
     
-    # Completeness: percentage of non-null entries.
-    completeness = (non_null_count / total_count) * 100
+    # List of fields that will appear as rows in the final report
+    report_fields = ['mag', 'depth', 'gap', 'rms', 'place', 'time', 'latitude/longitude']
+
+    # Initialize the results dictionary with default values
+    for field in report_fields:
+        results[field] = {
+            'Completeness (%)': '-',
+            'Validity (%)': '-',
+            'Precision (Proxy) (%)': '-', # New column
+            'Uniqueness (%)': '-'
+        }
     
-    # Validity: apply our simple check function.
-    col_dtype = df[col].dtype
-    valid_count = df[col].apply(lambda x: is_valid_value(x, col_dtype)).sum()
-    validity = (valid_count / total_count) * 100
+    total_records = len(df)
+
+    # --- 1. COMPLETENESS CALCULATION ---
+    single_fields_for_completeness = ['mag', 'depth', 'gap', 'rms', 'place', 'time']
+    for field in single_fields_for_completeness:
+        not_null_count = df[field].notna().sum()
+        results[field]['Completeness (%)'] = f"{(not_null_count / total_records) * 100:.2f}"
     
-    # Precision: for numeric columns we check the decimal precision, otherwise assume precise if not null.
-    if np.issubdtype(col_dtype, np.number):
-        precise_count = df[col].apply(lambda x: count_precision(x, col_dtype)).sum()
-    else:
-        precise_count = non_null_count  # assume all non-null values are precise for non-numeric types
-    precision = (precise_count / total_count) * 100
+    # Completeness for the latitude/longitude pair (complete only if both values are present)
+    complete_coords_count = df[['latitude', 'longitude']].notna().all(axis=1).sum()
+    results['latitude/longitude']['Completeness (%)'] = f"{(complete_coords_count / total_records) * 100:.2f}"
 
-    # Consistency: percentage of non-null entries that have the same type as the most common type.
-    non_null_types = df[col].dropna().map(lambda x: type(x))
-    if not non_null_types.empty:
-        mode_type = non_null_types.mode()[0]
-        consistency_count = non_null_types.map(lambda t: t == mode_type).sum()
-        consistency = (consistency_count / non_null_count) * 100
-    else:
-        consistency = 0
+    # --- 2. VALIDITY CALCULATION ---
+    results['mag']['Validity (%)'] = f"{(df['mag'].between(0.1, 10).sum() / total_records) * 100:.2f}"
+    for field in ['depth', 'gap', 'rms']:
+        results[field]['Validity (%)'] = f"{(df[field] >= 0).sum() / total_records * 100:.2f}"
+    results['place']['Validity (%)'] = f"{(df['place'].str.contains('Italy', case=False, na=False).sum() / total_records) * 100:.2f}"
+    results['time']['Validity (%)'] = f"{(pd.to_datetime(df['time'], errors='coerce').notna().sum() / total_records) * 100:.2f}"
+    valid_coords_count = (df['latitude'].between(35, 47) & df['longitude'].between(6, 19)).sum()
+    results['latitude/longitude']['Validity (%)'] = f"{(valid_coords_count / total_records) * 100:.2f}"
+    
+    # --- 3. PRECISION (PROXY) CALCULATION ---
+    # For 'mag', search for outliers using the IQR method
+    for field in ['mag']:
+        Q1 = df[field].quantile(0.25)
+        Q3 = df[field].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        # Count the records that are NOT outliers
+        precision_count = df[field].between(lower_bound, upper_bound).sum()
+        results[field]['Precision (Proxy) (%)'] = f"{(precision_count / total_records) * 100:.2f}"
+        
+    # For 'depth', count the values that are not the default '0.0'
+    precision_depth_count = (df['depth'] != 0.0).sum()
+    results['depth']['Precision (Proxy) (%)'] = f"{(precision_depth_count / total_records) * 100:.2f}"
 
-    # Uniqueness: percentage of duplicated (non-unique) values among the non-null entries.
-    unique_count = df[col].nunique(dropna=True)
-    duplicate_percentage = (1 - unique_count / non_null_count) * 100 if non_null_count > 0 else 0
 
-    metrics[col] = {
-        'Validity (%)': round(validity, 2),
-        'Completeness (%)': round(completeness, 2),
-        'Precision (%)': round(precision, 2),
-        'Consistency (%)': round(consistency, 2),
-        'Uniqueness (duplicated %)': round(duplicate_percentage, 2)
-    }
+    # --- 4. UNIQUENESS CALCULATION ---
+    unique_time_count = df['time'].nunique()
+    results['time']['Uniqueness (%)'] = f"{(unique_time_count / total_records) * 100:.2f}"
 
-# Create a DataFrame from the metrics dictionary and display the results.
-metrics_df = pd.DataFrame(metrics).T
-print(metrics_df)
+    # --- 5. FINAL REPORT ---
+    # Convert the dictionary to a pandas DataFrame for a tabular view
+    report_df = pd.DataFrame.from_dict(results, orient='index')
+    report_df.index.name = 'Field'
+    
+    print("--- Data Quality Report ---")
+    print(report_df.to_string())
+
+# --- SCRIPT EXECUTION ---
+if __name__ == "__main__":
+    # Specify the path to your CSV file
+    file_path = '0_earthquake_italy_full.csv'
+    analyze_data_quality_complete(file_path)
