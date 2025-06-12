@@ -1,13 +1,13 @@
-import pandas as pd
-import geopandas as gpd
-from shapely.geometry import Point
-import reverse_geocoder as rg
+import pandas as pd # type: ignore
+import geopandas as gpd # type: ignore
+from shapely.geometry import Point # type: ignore
+import reverse_geocoder as rg # type: ignore
 import numpy as np
 
 # ----- Configuration -----
-input_csv = '2_earthquake_italy_dropped_columns.csv'       # Path to your input CSV file
-output_csv = '3_earthquake_location.csv'  # Path for the augmented CSV file
-world_shapefile_path = 'ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp'  # Update this path!
+input_csv = '2_earthquake_italy_dropped_columns.csv'
+output_csv = '3_earthquake_location.csv'
+world_shapefile_path = 'ne_110m_admin_0_countries/ne_110m_admin_0_countries.shp'
 
 # ----- Step 1: Read the CSV file into a DataFrame -----
 # For memory constraints, consider using chunksize if required.

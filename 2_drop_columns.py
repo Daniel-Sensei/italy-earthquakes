@@ -1,8 +1,8 @@
-import pandas as pd
+import pandas as pd # type: ignore
 
 # Define the input and output CSV filenames.
-input_csv = "0_earthquake_italy_full.csv"   # This should be your original CSV file
-output_csv = "2_earthquake_italy_dropped_columns.csv"     # The cleaned CSV file will be saved here
+input_csv = "0_earthquake_italy_full.csv"
+output_csv = "2_earthquake_italy_dropped_columns.csv" 
 
 # List of columns to drop from the dataset
 columns_to_drop = [
@@ -26,8 +26,6 @@ def clean_data(input_file, output_file, drop_columns):
         print("New DataFrame shape:", df_clean.shape)
         print("Remaining columns:", list(df_clean.columns))
         
-        # Optional: further cleaning can be done here (e.g., dealing with missing values)
-        # For example, remove rows where the 'mag' column is NaN:
         if 'mag' in df_clean.columns:
             df_clean = df_clean.dropna(subset=['mag'])
             print("After dropping NaNs in 'mag', shape:", df_clean.shape)

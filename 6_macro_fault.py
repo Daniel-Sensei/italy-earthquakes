@@ -1,102 +1,100 @@
 import pandas as pd # type: ignore
-import numpy as np # Per gestire eventuali valori mancanti (NaN)
+import numpy as np # To handle potential missing values (NaN)
 
-# --- Configurazione Utente ---
-CSV_INPUT_PATH = '5_swarm_details_fault_location.csv'  # <<< MODIFICA QUESTO
-CSV_OUTPUT_PATH = '6_macro_fault.csv' # <<< MODIFICA QUESTO (opzionale)
+# --- Configuration ---
+CSV_INPUT_PATH = '5_swarm_details_fault_location.csv'
+CSV_OUTPUT_PATH = '6_macro_fault.csv'
 
-# Nomi delle colonne nel tuo CSV (adattali se necessario!)
+# Column names
 COL_MS_FAULT = 'MS_Fault'
 COL_MS_LAT = 'MS_Lat'
 COL_CS_FAULT = 'CS_Fault'
 COL_CS_LAT = 'CS_Lat'
 
-# SOGLIE DI LATITUDINE APPROSSIMATIVE PER NORD/CENTRO/SUD ITALIA
-# !!! ATTENZIONE: Queste sono soglie indicative! Adattale alle tue necessità specifiche
-#                 o a definizioni geografiche più precise per la tua analisi.
-LAT_MIN_NORD = 44.0  # Latitudine minima per considerare una località "Nord"
-LAT_MIN_CENTRO = 41.5 # Latitudine minima per considerare una località "Centro"
-                     # Tutto ciò che è sotto LAT_MIN_CENTRO sarà "Sud"
+# APPROXIMATE LATITUDE THRESHOLDS FOR NORTH/CENTER/SOUTH ITALY
+LAT_MIN_NORTH = 44.0  # Minimum latitude to be considered "North"
+LAT_MIN_CENTER = 41.5 # Minimum latitude to be considered "Center"
+                      # Everything below LAT_MIN_CENTER will be "South"
 
-# OPZIONE: Vuoi creare nuove colonne per le macro-regioni (True)
-# o sovrascrivere le colonne MS_Fault/CS_Fault esistenti (False)?
-# True è più sicuro per non perdere i nomi originali delle faglie.
-CREA_NUOVE_COLONNE_MACROREGIONE = True
-NUOVA_COL_MS_MACRO_FAGLIA = 'MS_Macro_Fault' # Nome se CREA_NUOVE_COLONNE_MACROREGIONE = True
-NUOVA_COL_CS_MACRO_FAGLIA = 'CS_Macro_Fault' # Nome se CREA_NUOVE_COLONNE_MACROREGIONE = True
-# --- Fine Configurazione Utente ---
+# OPTION: Do you want to create new columns for the macro-regions (True)
+# or overwrite the existing MS_Fault/CS_Fault columns (False)?
+# True is safer to avoid losing the original fault names.
+CREATE_NEW_MACRO_REGION_COLUMNS = True
+NEW_COL_MS_MACRO_FAULT = 'MS_Macro_Fault' # Name if CREATE_NEW_MACRO_REGION_COLUMNS = True
+NEW_COL_CS_MACRO_FAULT = 'CS_Macro_Fault' # Name if CREATE_NEW_MACRO_REGION_COLUMNS = True
+# --- End of Configuration ---
 
-def assegna_macro_regione(latitudine):
+def assign_macro_region(latitude):
     """
-    Assegna una macro-regione ('Nord', 'Centro', 'Sud') basata sulla latitudine.
-    Restituisce 'Sconosciuto' se la latitudine non è valida.
+    Assigns a macro-region ('North', 'Center', 'South') based on latitude.
+    Returns 'Unknown' if the latitude is invalid.
     """
-    if pd.isna(latitudine):
-        return 'Sconosciuto'
+    if pd.isna(latitude):
+        return 'Unknown'
     try:
-        lat = float(latitudine)
-        if lat >= LAT_MIN_NORD:
-            return 'Nord'
-        elif lat >= LAT_MIN_CENTRO:
-            return 'Centro'
+        lat = float(latitude)
+        if lat >= LAT_MIN_NORTH:
+            return 'North'
+        elif lat >= LAT_MIN_CENTER:
+            return 'Center'
         else:
-            return 'Sud'
+            return 'South'
     except ValueError:
-        return 'Sconosciuto' # Se la conversione a float fallisce
+        return 'Unknown' # If the float conversion fails
 
 def main():
-    print(f"Caricamento dati da: {CSV_INPUT_PATH}")
+    print(f"Loading data from: {CSV_INPUT_PATH}")
     try:
         df = pd.read_csv(CSV_INPUT_PATH)
     except FileNotFoundError:
-        print(f"Errore: File non trovato '{CSV_INPUT_PATH}'")
+        print(f"Error: File not found '{CSV_INPUT_PATH}'")
         return
     except Exception as e:
-        print(f"Errore durante il caricamento del CSV: {e}")
+        print(f"Error while loading the CSV: {e}")
         return
 
-    # Verifica la presenza delle colonne di latitudine necessarie
-    colonne_lat_necessarie = [COL_MS_LAT, COL_CS_LAT]
-    for col in colonne_lat_necessarie:
+    # Check for the presence of the required latitude columns
+    required_lat_columns = [COL_MS_LAT, COL_CS_LAT]
+    for col in required_lat_columns:
         if col not in df.columns:
-            print(f"Errore: La colonna di latitudine '{col}' specificata non è presente nel CSV.")
-            print("Controlla i nomi delle colonne in 'COL_MS_LAT' e 'COL_CS_LAT' nello script.")
+            print(f"Error: The specified latitude column '{col}' is not present in the CSV.")
+            print("Check the column names in 'COL_MS_LAT' and 'COL_CS_LAT' in the script.")
             return
 
-    print("Assegnazione macro-regioni basate sulla latitudine...")
+    print("Assigning macro-regions based on latitude...")
 
-    # Applica la funzione per creare le stringhe di macro-regione
-    ms_macro_regioni = df[COL_MS_LAT].apply(assegna_macro_regione)
-    cs_macro_regioni = df[COL_CS_LAT].apply(assegna_macro_regione)
+    # Apply the function to create the macro-region strings
+    ms_macro_regions = df[COL_MS_LAT].apply(assign_macro_region)
+    cs_macro_regions = df[COL_CS_LAT].apply(assign_macro_region)
 
-    if CREA_NUOVE_COLONNE_MACROREGIONE:
-        print(f"Creazione nuove colonne '{NUOVA_COL_MS_MACRO_FAGLIA}' e '{NUOVA_COL_CS_MACRO_FAGLIA}'.")
-        df[NUOVA_COL_MS_MACRO_FAGLIA] = ms_macro_regioni
-        df[NUOVA_COL_CS_MACRO_FAGLIA] = cs_macro_regioni
+    if CREATE_NEW_MACRO_REGION_COLUMNS:
+        print(f"Creating new columns '{NEW_COL_MS_MACRO_FAULT}' and '{NEW_COL_CS_MACRO_FAULT}'.")
+        df[NEW_COL_MS_MACRO_FAULT] = ms_macro_regions
+        df[NEW_COL_CS_MACRO_FAULT] = cs_macro_regions
     else:
-        print(f"Modifica delle colonne esistenti '{COL_MS_FAULT}' e '{COL_CS_FAULT}'.")
-        # Verifica la presenza delle colonne delle faglie prima di modificarle
-        colonne_faglie_necessarie = [COL_MS_FAULT, COL_CS_FAULT]
-        for col in colonne_faglie_necessarie:
+        print(f"Overwriting existing columns '{COL_MS_FAULT}' and '{COL_CS_FAULT}'.")
+        # Check for the presence of fault columns before modifying them
+        required_fault_columns = [COL_MS_FAULT, COL_CS_FAULT]
+        for col in required_fault_columns:
             if col not in df.columns:
-                print(f"Attenzione: La colonna faglia '{col}' da modificare non è presente nel CSV.")
-                print(f"Verrà creata la colonna '{col}' con i valori della macro-regione.")
-        df[COL_MS_FAULT] = ms_macro_regioni
-        df[COL_CS_FAULT] = cs_macro_regioni
+                print(f"Warning: The fault column '{col}' to be modified is not present in the CSV.")
+                print(f"The column '{col}' will be created with the macro-region values.")
+        df[COL_MS_FAULT] = ms_macro_regions
+        df[COL_CS_FAULT] = cs_macro_regions
 
-    print(f"Salvataggio dati modificati in: {CSV_OUTPUT_PATH}")
+    print(f"Saving modified data to: {CSV_OUTPUT_PATH}")
     try:
         df.to_csv(CSV_OUTPUT_PATH, index=False)
-        print("Operazione completata con successo!")
-        if CREA_NUOVE_COLONNE_MACROREGIONE:
-            print(f"Le macro-regioni sono state salvate nelle colonne '{NUOVA_COL_MS_MACRO_FAGLIA}' e '{NUOVA_COL_CS_MACRO_FAGLIA}'.")
-            print(f"I nomi originali delle faglie in '{COL_MS_FAULT}' e '{COL_CS_FAULT}' sono stati conservati.")
+        print("Operation completed successfully!")
+        if CREATE_NEW_MACRO_REGION_COLUMNS:
+            print(f"The macro-regions have been saved in the '{NEW_COL_MS_MACRO_FAULT}' and '{NEW_COL_CS_MACRO_FAULT}' columns.")
+            print(f"The original fault names in '{COL_MS_FAULT}' and '{COL_CS_FAULT}' have been preserved.")
         else:
-            print(f"I nomi delle faglie in '{COL_MS_FAULT}' e '{COL_CS_FAULT}' sono stati sostituiti con le macro-regioni.")
-            print("Si consiglia di avere un backup del file originale.")
+            print(f"The fault names in '{COL_MS_FAULT}' and '{COL_CS_FAULT}' have been replaced with the macro-regions.")
+            print("It is recommended to have a backup of the original file.")
 
     except Exception as e:
-        print(f"Errore durante il salvataggio del CSV: {e}")
+        print(f"Error while saving the CSV: {e}")
 
 if __name__ == '__main__':
     main()
