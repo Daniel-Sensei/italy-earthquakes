@@ -1,5 +1,7 @@
 # A Dimensional Model for the Analysis of Seismic Events in Italy
 
+<img width="1372" alt="Pasted Graphic 11" src="https://github.com/user-attachments/assets/84e1ddb6-d67f-477e-b27d-abe966361239" />
+
 ## Core Workflow
 
 * **Data Acquisition & Cleaning**: Fetches and filters raw data from the USGS FDSN web service and assesses data quality.
